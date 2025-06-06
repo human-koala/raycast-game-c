@@ -84,3 +84,128 @@ void render_enemies(SDL_Renderer *renderer, Player *player, Enemy enemies_list[]
         }
     }
 }
+
+// Helper functions for distance and Line of Sight
+
+// Note: math.h is already included at the top of this file for sqrtf, fabsf, floorf
+
+float calculate_distance(float x1, float y1, float x2, float y2) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    return sqrtf(dx * dx + dy * dy);
+}
+
+// Basic Line of Sight check using grid iteration.
+// This is a simple version, can be improved with Bresenham's or similar.
+int has_line_of_sight(const int map[MAP_HEIGHT][MAP_WIDTH], float x1, float y1, float x2, float y2) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float steps;
+
+    if (fabsf(dx) > fabsf(dy)) {
+        steps = fabsf(dx);
+    } else {
+        steps = fabsf(dy);
+    }
+
+    if (steps == 0) return 1; // Same point, LOS exists
+
+    float x_increment = dx / steps;
+    float y_increment = dy / steps;
+
+    float current_x = x1;
+    float current_y = y1;
+
+    for (int i = 0; i < (int)steps; i++) {
+        current_x += x_increment;
+        current_y += y_increment;
+
+        int map_x = (int)floorf(current_x);
+        int map_y = (int)floorf(current_y);
+
+        // Check bounds first
+        if (map_x < 0 || map_x >= MAP_WIDTH || map_y < 0 || map_y >= MAP_HEIGHT) {
+            return 0; // Line goes out of bounds, effectively blocked
+        }
+        // Check if the cell is a wall
+        if (map[map_y][map_x] != 0) {
+            // Check if this wall is not the very start or end tile if they themselves are walls (unlikely for entity positions)
+            // For simplicity, any wall along the path blocks LOS.
+            return 0; // Wall detected
+        }
+    }
+    return 1; // No wall detected along the line
+}
+
+void update_single_enemy(Enemy *enemy, Player *player, const int map[MAP_HEIGHT][MAP_WIDTH]) {
+    if (!enemy || !enemy->active || !player) {
+        return;
+    }
+
+    float distance_to_player = calculate_distance(enemy->x, enemy->y, player->x, player->y);
+
+    // Max distance for enemy to react (e.g. 5 tiles, but line of sight is also checked)
+    // Using a smaller aggro distance for initial testing.
+    const float max_aggro_distance = 2.0f;
+    const float min_approach_distance = 0.5f; // Stop if very close to player
+
+    if (distance_to_player <= max_aggro_distance && distance_to_player > min_approach_distance) {
+        if (has_line_of_sight(map, enemy->x, enemy->y, player->x, player->y)) {
+            // Enemy sees the player and is close enough, try to move towards player.
+
+            float dir_x = player->x - enemy->x;
+            float dir_y = player->y - enemy->y;
+
+            // Normalize direction vector
+            float length = sqrtf(dir_x * dir_x + dir_y * dir_y);
+            if (length == 0) length = 1; // Avoid division by zero if already at player pos
+            float norm_dx = dir_x / length;
+            float norm_dy = dir_y / length;
+
+            float next_ex = enemy->x + norm_dx * ENEMY_MOVE_SPEED;
+            float next_ey = enemy->y + norm_dy * ENEMY_MOVE_SPEED;
+
+            // Basic wall collision for enemy (similar to player's simplified collision)
+            // Store original position for Y-check if X is blocked
+            float original_enemy_x = enemy->x;
+            // float original_enemy_y = enemy->y; // Not strictly needed with current sliding logic
+
+            // Check X-movement component
+            int target_map_x_for_x_move = (int)(next_ex);
+            int current_map_y_for_x_check = (int)(enemy->y); // Use current y for X-move check
+
+            if (target_map_x_for_x_move >= 0 && target_map_x_for_x_move < MAP_WIDTH &&
+                current_map_y_for_x_check >= 0 && current_map_y_for_x_check < MAP_HEIGHT &&
+                map[current_map_y_for_x_check][target_map_x_for_x_move] == 0) {
+                enemy->x = next_ex;
+            }
+            // else: X move blocked, enemy->x remains unchanged.
+
+            // Check Y-movement component
+            // Uses potentially updated enemy->x if X move was successful, or original enemy->x if X was blocked.
+            // But next_ey was calculated based on original enemy->y.
+            int current_map_x_for_y_check = (int)(enemy->x);
+            int target_map_y_for_y_move = (int)(next_ey);
+
+            if (target_map_y_for_y_move >= 0 && target_map_y_for_y_move < MAP_HEIGHT &&
+                current_map_x_for_y_check >= 0 && current_map_x_for_y_check < MAP_WIDTH &&
+                map[target_map_y_for_y_move][current_map_x_for_y_check] == 0) {
+                enemy->y = next_ey;
+            }
+            // else: Y move blocked, enemy->y remains unchanged based on next_ey.
+            // If X was successful, Y might still be blocked. If X was blocked, Y is also attempted from original X (effectively).
+            // The current logic for Y check is: current_map_x = (int)(enemy->x);
+            // This means if X move was successful, Y check is from new X.
+            // If X move was blocked, Y check is from old X. This is standard sliding.
+        }
+    }
+    // Else: Player is too far, or no line of sight, or too close. Enemy does nothing (remains idle).
+}
+
+void update_enemies_ai_logic(Enemy enemies_list[], int num_enemies, Player *player, const int map[MAP_HEIGHT][MAP_WIDTH]) {
+    for (int i = 0; i < num_enemies; i++) {
+        if (enemies_list[i].active) {
+            update_single_enemy(&enemies_list[i], player, map);
+        }
+    }
+}

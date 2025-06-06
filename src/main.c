@@ -108,6 +108,9 @@ int main(int argc, char* argv[]) {
                 move_player_with_slide(&player, (const int (*)[MAP_WIDTH])game_map, current_move_speed, 0.0f); // 0.0f for sideways speed for now
             }
 
+            // Update enemy AI logic
+            update_enemies_ai_logic(enemies, MAX_ENEMIES, &player, (const int (*)[MAP_WIDTH])game_map);
+
             // Clear screen (now handled by cast_rays start - floor/ceiling)
             // SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF); // Black
             // SDL_RenderClear(renderer);

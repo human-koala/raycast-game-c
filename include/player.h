@@ -4,8 +4,8 @@
 #include <SDL2/SDL.h> // For SDL_bool
 #include "map.h" // Include map.h to get MAP_WIDTH and MAP_HEIGHT
 
-#define PLAYER_MOVE_SPEED 0.03
-#define PLAYER_TURN_SPEED 0.02
+#define PLAYER_MOVE_SPEED 0.015
+#define PLAYER_TURN_SPEED 0.01
 
 typedef struct {
     float x;
