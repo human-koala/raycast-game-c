@@ -5,7 +5,7 @@
 #include "map.h" // Include map.h to get MAP_WIDTH and MAP_HEIGHT
 
 #define PLAYER_MOVE_SPEED 0.03
-#define PLAYER_TURN_SPEED 0.05
+#define PLAYER_TURN_SPEED 0.02
 
 typedef struct {
     float x;
